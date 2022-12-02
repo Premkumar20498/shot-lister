@@ -13,14 +13,64 @@ const db = mysql.createPool({
 app.use(cors());
 app.use(express.json())
 
+app.post('/api/user-login',(req,res)=>{
+    const user = req.body.un;
+    const email = req.body.em
+    
+    const getPass = `select password from users where userName='${user}' || email='${email}'`
+
+    db.query(getPass,(error,result)=>{
+        if(error)
+        {
+            res.status(400).send(JSON.stringify({message: "Something went wrong"}))
+        }
+        else
+        {
+            if(result.length === 0)
+            {
+                res.status(404).send(JSON.stringify({message:"User Not Found"}))
+            }
+            else
+            {
+                res.status(200).send(JSON.stringify({hash:result[0].password}))
+            }
+        }
+    })
+})
+
+app.post('/api/create-user', (req, res) => {
+    const name = req.body.name;
+    const email = req.body.email;
+    const userName = req.body.username;
+    const password = req.body.password;
+
+    const createUser = `INSERT INTO users (name,userName,email,password) VALUES (?,?,?,?)`
+
+    db.query(createUser, [name, userName, email, password], (error, result) => {
+        if (error) {
+            const message = error.sqlMessage.split("key")[1].split("_")[0].split(".")[1] === 'userName' ? "User Name" : "Email";
+            res.status(400).send(JSON.stringify({
+                message: message + " is already exists. Please use different or login with valid credentials"
+            }))
+        }
+        else {
+            res.status(201).send(JSON.stringify({
+                message: "New user created successfully"
+            }))
+        }
+    })
+})
+
 app.get('/api/export/:projectId', (req, res) => {
     const { projectId } = req.params;
-    const getProjectsForExport = "call "+process.env.REACT_APP_DATA_BASE+".get_full_project(?);"
+    const getProjectsForExport = "call " + process.env.REACT_APP_DATA_BASE + ".get_full_project(?);"
     db.query(getProjectsForExport, [projectId], (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -28,9 +78,11 @@ app.get('/api/projects', (req, res) => {
     const projects = 'SELECT * FROM projects order by sn asc'
     db.query(projects, (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -39,9 +91,11 @@ app.get("/api/details/project/:projectId", (req, res) => {
     const projectDetails = "SELECT * FROM projects WHERE projectId =? order by sn asc"
     db.query(projectDetails, [projectId], (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -50,9 +104,11 @@ app.get("/api/project/:projectId", (req, res) => {
     const project = "SELECT * FROM scenes WHERE projectId =? order by sn asc"
     db.query(project, [projectId], (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -61,9 +117,11 @@ app.get("/api/details/scene/:sceneId", (req, res) => {
     const sceneDetails = "SELECT * FROM scenes WHERE sceneId =? order by sn asc"
     db.query(sceneDetails, [sceneId], (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -74,9 +132,11 @@ app.get("/api/scene/:sceneId", (req, res) => {
 
     db.query(scene, (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -87,9 +147,11 @@ app.get("/api/details/shot/:shotId", (req, res) => {
 
     db.query(shot, (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -100,9 +162,11 @@ app.get("/api/shot/:shotId", (req, res) => {
 
     db.query(shot, (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -111,7 +175,12 @@ app.post('/api/project/create', (req, res) => {
     const projectName = req.body.name
     const createProject = `INSERT INTO projects (projectid,projectName) VALUES ('${projectId}','${projectName}')`
     db.query(createProject, (error, result) => {
-        res.send(result)
+        if (error) {
+            res.status(400).send(error)
+        }
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -129,9 +198,11 @@ app.post('/api/scene/create', (req, res) => {
 
     db.query(createScene, (error, result) => {
         if (error) {
-            res.send(error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(201).send(result)
+        }
     })
 })
 
@@ -150,9 +221,11 @@ app.post('/api/shot/create', (req, res) => {
     db.query(createShot, [shotId, sceneId, number, type, angle, movement, action, notes],
         (error, result) => {
             if (error) {
-                res.send("Error" - error)
+                res.status(400).send(error)
             }
-            res.send(result)
+            else {
+                res.status(201).send(result)
+            }
         })
 })
 
@@ -164,9 +237,11 @@ app.put('/api/project/update', (req, res) => {
     where projectId = '${projectId}'`
     db.query(updateProject, (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -185,9 +260,11 @@ app.put('/api/scene/update', (req, res) => {
 
     db.query(updateScene, (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
@@ -208,43 +285,51 @@ app.post('/api/shot/update', (req, res) => {
 
     db.query(updateShot, (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
 app.delete("/api/project/delete/:projectId", (req, res) => {
     const { projectId } = req.params;
-    const deleteProject = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('project', ?)"
+    const deleteProject = "CALL " + process.env.REACT_APP_DATA_BASE + ".delete('project', ?)"
     db.query(deleteProject, projectId, (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 
 })
 
 app.delete("/api/scene/delete/:sceneId", (req, res) => {
     const { sceneId } = req.params;
-    const deleteScene = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('scene', ?)"
+    const deleteScene = "CALL " + process.env.REACT_APP_DATA_BASE + ".delete('scene', ?)"
     db.query(deleteScene, [sceneId], (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
 app.delete("/api/shot/delete/:shotId", (req, res) => {
     const { shotId } = req.params;
-    const deleteShot = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('shot', ?)"
+    const deleteShot = "CALL " + process.env.REACT_APP_DATA_BASE + ".delete('shot', ?)"
     db.query(deleteShot, [shotId], (error, result) => {
         if (error) {
-            res.send("Error" - error)
+            res.status(400).send(error)
         }
-        res.send(result)
+        else {
+            res.status(200).send(result)
+        }
     })
 })
 
