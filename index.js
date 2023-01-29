@@ -1,253 +1,624 @@
 const express = require('express');
 const app = express();
 const cors = require("cors");
-const mysql = require("mysql");
+const mongoose = require('mongoose')
+const jwt = require('jsonwebtoken');
+const schema = require('./Schema')
+require('dotenv').config();
 
-const db = mysql.createPool({
-    host: process.env.REACT_APP_HOST_NAME,
-    user: process.env.REACT_APP_USER,
-    password: process.env.REACT_APP_PASSWORD,
-    database: process.env.REACT_APP_DATA_BASE
-});
+let auth = ""
+
+
+mongoose.set('strictQuery', true)
+mongoose.connect(`mongodb+srv://${process.env.DB_NAME}:${process.env.DB_NAME}@cluster0.aq5goyo.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`)
 
 app.use(cors());
 app.use(express.json())
 
-app.get('/api/export/:projectId', (req, res) => {
-    const { projectId } = req.params;
-    const getProjectsForExport = "call "+process.env.REACT_APP_DATA_BASE+".get_full_project(?);"
-    db.query(getProjectsForExport, [projectId], (error, result) => {
-        if (error) {
-            res.send(error)
+
+
+app.post('/api/user-login', async (req, res) => {
+    const user = req.body.un;
+    const email = req.body.em
+
+    await schema.users.find({
+        $or: [{ "user_name": user },
+        { "email": email }]
+    }).then(result => {
+        if (result.length === 0) {
+            res.status(404).send(JSON.stringify({ "error": "User not found" }))
         }
-        res.send(result)
-    })
-})
-
-app.get('/api/projects', (req, res) => {
-    const projects = 'SELECT * FROM projects order by sn asc'
-    db.query(projects, (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/details/project/:projectId", (req, res) => {
-    const { projectId } = req.params;
-    const projectDetails = "SELECT * FROM projects WHERE projectId =? order by sn asc"
-    db.query(projectDetails, [projectId], (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/project/:projectId", (req, res) => {
-    const { projectId } = req.params;
-    const project = "SELECT * FROM scenes WHERE projectId =? order by sn asc"
-    db.query(project, [projectId], (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/details/scene/:sceneId", (req, res) => {
-    const { sceneId } = req.params;
-    const sceneDetails = "SELECT * FROM scenes WHERE sceneId =? order by sn asc"
-    db.query(sceneDetails, [sceneId], (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/scene/:sceneId", (req, res) => {
-    const { sceneId } = req.params;
-    const scene = `SELECT * FROM shots
-    where sceneId='${sceneId}' order by sn asc`
-
-    db.query(scene, (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/details/shot/:shotId", (req, res) => {
-    const { shotId } = req.params;
-    const shot = `SELECT * FROM shots
-    where shotId='${shotId}'`
-
-    db.query(shot, (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.get("/api/shot/:shotId", (req, res) => {
-    const { sceneId, shotId } = req.params;
-    const shot = `SELECT * FROM shots
-    where sceneId='${sceneId}' and shotId='${shotId}' order by sn asc`
-
-    db.query(shot, (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.post('/api/project/create', (req, res) => {
-    const projectId = req.body.id
-    const projectName = req.body.name
-    const createProject = `INSERT INTO projects (projectid,projectName) VALUES ('${projectId}','${projectName}')`
-    db.query(createProject, (error, result) => {
-        res.send(result)
-    })
-})
-
-app.post('/api/scene/create', (req, res) => {
-    const proId = req.body.proId
-    const sceneId = req.body.id
-    const number = req.body.number
-    const description = req.body.description
-    const loctype = req.body.locType
-    const loc = req.body.loc
-    const time = req.body.time
-
-    const createScene = `INSERT INTO scenes (sceneId,projectId,number,description,locationType,location,time) VALUES
-    ('${sceneId}','${proId}','${number}','${description}','${loctype}','${loc}','${time}')`
-
-    db.query(createScene, (error, result) => {
-        if (error) {
-            res.send(error)
-        }
-        res.send(result)
-    })
-})
-
-app.post('/api/shot/create', (req, res) => {
-
-    const shotId = req.body.shotId
-    const sceneId = req.body.sceneId
-    const number = req.body.number
-    const type = req.body.type
-    const angle = req.body.angle
-    const movement = req.body.movement
-    const action = req.body.action
-    const notes = req.body.notes
-
-    const createShot = 'INSERT INTO shots (shotId,sceneId,number,type,angle,movement,action,notes) VALUES (?,?,?,?,?,?,?,?)';
-    db.query(createShot, [shotId, sceneId, number, type, angle, movement, action, notes],
-        (error, result) => {
-            if (error) {
-                res.send("Error" - error)
+        else {
+            const userId = result[0].user_id
+            const name = result[0].name
+            const userName = result[0].user_name
+            const password = result[0].password
+            const data = {
+                userId,
+                name,
+                userName,
             }
-            res.send(result)
+            const token = jwt.sign(data, process.env.REACT_APP_SECRETE_KEY)
+            res.status(200).send(JSON.stringify({
+                "message": "logged in successfully",
+                "hash": password,
+                "token": token,
+                "uID":userId
+            }))
+        }
+    })
+})
+
+
+app.post('/api/create-user', (req, res) => {
+    const userId = req.body.userId;
+    const name = req.body.name;
+    const email = req.body.email;
+    const userName = req.body.username;
+    const password = req.body.password;
+
+    const new_user = new schema.users({
+        "user_id": userId,
+        "user_name": userName,
+        "name": name,
+        "password": password,
+        "email": email
+    })
+
+    schema.users.find({
+        $or: [{ "user_name": userName },
+        { "email": email }]
+    }).then(result => {
+        if (result.length === 0) {
+            new_user.save().then(out => {
+                const data = {
+                    userId,
+                    name,
+                    userName,
+                    email
+                }
+                const token = jwt.sign(data, process.env.REACT_APP_SECRETE_KEY)
+                res.status(201).send(JSON.stringify({
+                    "token": token
+                }))
+            });
+        }
+        else {
+            res.status(400).send(JSON.stringify({
+                "message": "User details are already exists. Please use different or login with valid credentials"
+            }))
+        }
+    })
+})
+
+
+app.get('/api/export/:projectId', (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const { projectId } = req.params;
+                const getProjectsForExport = "call " + process.env.REACT_APP_DATA_BASE + ".get_full_project(?);"
+                db.query(getProjectsForExport, [projectId], (error, result) => {
+                    if (error) {
+                        res.status(400).send(error)
+                    }
+                    else {
+                        res.status(200).send(result)
+                    }
+                })
+            }
         })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
+
+// Get All Projects
+app.get('/api/projects', (req, res) => {
+    auth = req.headers.authorization
+
+    const uId = req.query.uId ;
+
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                schema.proSchema.find({"userId":uId}).then(result => {
+                    res.status(200).send(result)
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Get individual project details for update
+app.get("/api/details/project/:projectId", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const { projectId } = req.params;
+                const projectDetails = "SELECT * FROM projects WHERE projectId =? order by sn asc"
+                db.query(projectDetails, [projectId], (error, result) => {
+                    if (error) {
+                        res.status(400).send(error)
+                    }
+                    else {
+                        res.status(200).send(result)
+                    }
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Get All Scenes
+app.get("/api/get-scenes-list", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, async function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const id = req.query.id;
+                await schema.sceneSchema.find({ "projectId": id }).then(result => {
+                    res.status(200).send(result)
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Get individual scene details for update
+app.get("/api/details/scene", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const sid= req.query.s_Id;
+                
+                schema.sceneSchema.findOne({"sceneId":sid}).then(result=>{
+                    res.status(200).send(result)
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Get All Shots
+app.get("/api/get-shots-list", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, async function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const sid = req.query.s_Id;
+
+                await schema.shotSchema.find({"sceneId":sid}).then(result => {
+                    res.status(200).send(result)
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Get individual shot details for update
+app.get("/api/details/shot", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const shid = req.query.sh_Id;
+                
+                schema.shotSchema.findOne({"shotId":shid}).then(result=>{
+                    res.status(200).send(result)
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Create Project
+app.post('/api/project/create', (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const pId = req.body.id
+                const pName = req.body.name
+                const uId = req.body.uId
+
+                const new_project = new schema.proSchema({
+                    "projectId": pId,
+                    "projectName": pName,
+                    "userId": uId
+                })
+                new_project.save().then(result => {
+                    res.status(201).send(JSON.stringify({ "message": `Project is Ccreated with name ${pName}` }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Create Scene
+app.post('/api/scene/create', (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const proId = req.body.proId
+                const sceneId = req.body.id
+                const number = req.body.number
+                const description = req.body.description
+                const loctype = req.body.locType
+                const loc = req.body.loc
+                const time = req.body.time
+
+                const new_scene = new schema.sceneSchema({
+                    number: number,
+                    sceneId: sceneId,
+                    projectId: proId,
+                    description: description,
+                    locationType: loctype,
+                    location: loc,
+                    time: time
+                })
+
+                new_scene.save().then(result => {
+                    res.status(201).send(JSON.stringify({ "message": "Scene added successfully" }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Create Shot
+app.post('/api/shot/create', (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+
+                const shotId = req.body.shotId
+                const sceneId = req.body.sceneId
+                const number = req.body.number
+                const type = req.body.type
+                const angle = req.body.angle
+                const movement = req.body.movement
+                const action = req.body.action
+                const notes = req.body.notes
+
+                const new_shot = new schema.shotSchema({
+                    number:number,
+                    shotId:shotId,
+                    sceneId:sceneId,
+                    type:type,
+                    angle:angle,
+                    movement:movement,
+                    action:action,
+                    notes:notes
+                })
+
+                new_shot.save().then(result=>{
+                    res.status(201).send(JSON.stringify({"message":"Shot is added to the scene successfully"}))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
+})
+
+
+//Update Project
 app.put('/api/project/update', (req, res) => {
-    const projectId = req.body.id
-    const projectName = req.body.projectname
-    const updateProject = `update projects
-    set projectName='${projectName}'
-    where projectId = '${projectId}'`
-    db.query(updateProject, (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const projectId = req.body.id
+                const projectName = req.body.projectname
+
+                schema.proSchema.updateOne({ "projectId": projectId }, { "projectName": projectName }).then(result => {
+                    res.status(200).send(JSON.stringify({ "message": `Project name is successfully changed as ${projectName}` }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
+
+//Update Scene
 app.put('/api/scene/update', (req, res) => {
-    const prjectId = req.body.prjectId
-    const sceneId = req.body.id
-    const sceneNumber = req.body.number
-    const sceneDescription = req.body.description
-    const locationType = req.body.locType
-    const location = req.body.loc
-    const time = req.body.time
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
 
-    const updateScene = `update scenes
-    set number='${sceneNumber}', description='${sceneDescription}', locationType='${locationType}' , location='${location}' , time='${time}'
-    where projectId= '${prjectId}' and sceneId ='${sceneId}'`
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const prjectId = req.body.prjectId
+                const sceneNumber = req.body.number
+                const sceneDescription = req.body.description
+                const locationType = req.body.locType
+                const location = req.body.loc
+                const time = req.body.time
 
-    db.query(updateScene, (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
+                schema.sceneSchema.updateOne({ "projectId": prjectId }, {
+                    "number": sceneNumber,
+                    "description": sceneDescription,
+                    "locationType": locationType,
+                    "location": location,
+                    "time": time
+                }).then(result=>{
+                    res.status(200).send(JSON.stringify({"message":"Scene is updated successfully"}))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
-app.post('/api/shot/update', (req, res) => {
 
-    const shotId = req.body.shotId
-    const sceneId = req.body.sceneId
-    const number = req.body.number
-    const type = req.body.type
-    const angle = req.body.angle
-    const movement = req.body.movement
-    const action = req.body.action
-    const notes = req.body.notes
+//Update Shot
+app.put('/api/shot/update', (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
 
-    const updateShot = `update shots
-    set number='${number}', type='${type}', angle='${angle}' , movement='${movement}' , action='${action}', notes='${notes}'
-    where sceneId= '${sceneId}}' and shotId ='${shotId}'`;
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
 
-    db.query(updateShot, (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
+                const sceneId = req.body.sceneId
+                const number = req.body.number
+                const type = req.body.type
+                const angle = req.body.angle
+                const movement = req.body.movement
+                const action = req.body.action
+                const notes = req.body.notes
+
+                schema.shotSchema.updateOne({sceneId:sceneId},{
+                    number:number,
+                    angle:angle,
+                    movement:movement,
+                    type:type,
+                    action:action,
+                    notes:notes
+                }).then(result=>{
+                    res.send(result)
+                    // res.status(200).send(JSON.stringify({"message":"Shot is updated successfully"}))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
-app.delete("/api/project/delete/:projectId", (req, res) => {
-    const { projectId } = req.params;
-    const deleteProject = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('project', ?)"
-    db.query(deleteProject, projectId, (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
 
+//Delete Project
+app.delete("/api/project/delete", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, async function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+
+                const pid  = req.query.p_Id;
+
+                await schema.proSchema.findOneAndDelete({ "projectId": pid }).then(result => {
+
+                    res.status(200).send(JSON.stringify({ "message": "Project deleted successfully" }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
-app.delete("/api/scene/delete/:sceneId", (req, res) => {
-    const { sceneId } = req.params;
-    const deleteScene = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('scene', ?)"
-    db.query(deleteScene, [sceneId], (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
+
+//Delete Scene
+app.delete("/api/scene/delete", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, async function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const sid = req.query.s_Id;
+                await schema.sceneSchema.findOneAndDelete({ "sceneId": sceneId }).then(result => {
+
+                    res.status(200).send(JSON.stringify({ "message": "Scene deleted successfully" }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
-app.delete("/api/shot/delete/:shotId", (req, res) => {
-    const { shotId } = req.params;
-    const deleteShot = "CALL "+process.env.REACT_APP_DATA_BASE+".delete('shot', ?)"
-    db.query(deleteShot, [shotId], (error, result) => {
-        if (error) {
-            res.send("Error" - error)
-        }
-        res.send(result)
-    })
+
+//Delete Shot
+app.delete("/api/shot/delete", (req, res) => {
+    auth = req.headers.authorization;
+    if (auth !== null && auth !== '') {
+
+        jwt.verify(auth, process.env.REACT_APP_SECRETE_KEY, function (error, outcome) {
+            if (error) {
+                return res.status(401).send(JSON.stringify({
+                    error: "Authorization Failed"
+                }))
+            }
+            else {
+                const shid= req.query.sh_Id;
+                
+                schema.shotSchema.findOneAndDelete({"shotId":shid}).then(result=>{
+                    res.status(200).send(JSON.stringify({ "message": "Shot deleted successfully" }))
+                })
+            }
+        })
+    }
+    else {
+        res.status(401).send(JSON.stringify({
+            error: "Authorization Failed"
+        }))
+    }
 })
 
+
+//Connection to the Server
 app.listen(process.env.REACT_APP_PORT, () => {
-    console.log(`Server is running on ${process.env.REACT_APP_PORT}....`);
+    console.log(`Server running on the port ${process.env.REACT_APP_PORT}`)
 });
