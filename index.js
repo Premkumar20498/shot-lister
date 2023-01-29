@@ -10,7 +10,7 @@ let auth = ""
 
 
 mongoose.set('strictQuery', true)
-mongoose.connect(`mongodb+srv://${process.env.REACT_APP_DB_NAME}:${process.env.REACT_APP_DB_NAME}@cluster0.aq5goyo.mongodb.net/${process.env.REACT_APP_DB_NAME}?retryWrites=true&w=majority`)
+mongoose.connect(`mongodb+srv://${process.env.REACT_APP_DB_NAME}:${process.env.REACT_APP_DB_NAME}@${process.env.REACT_APP_CLUSTER_NAME}.${process.env.REACT_APP_COLLECTION_NAME}.mongodb.net/${process.env.REACT_APP_DB_NAME}?retryWrites=true&w=majority`)
 
 app.use(cors());
 app.use(express.json())
@@ -621,4 +621,5 @@ app.delete("/api/shot/delete", (req, res) => {
 //Connection to the Server
 app.listen(process.env.REACT_APP_PORT, () => {
     console.log(`Server running on the port ${process.env.REACT_APP_PORT}`)
+    console.log(`DB name ${process.env.REACT_APP_DB_NAME}`)
 });
