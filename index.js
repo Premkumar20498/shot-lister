@@ -10,7 +10,7 @@ let auth = ""
 
 
 mongoose.set('strictQuery', true)
-mongoose.connect(`mongodb+srv://${process.env.REACT_APP_DB_NAME}:${process.env.REACT_APP_DB_NAME}@${process.env.REACT_APP_CLUSTER_NAME}.${process.env.REACT_APP_COLLECTION_NAME}.mongodb.net/${process.env.REACT_APP_DB_NAME}?retryWrites=true&w=majority`)
+await mongoose.connect(`mongodb+srv://${process.env.REACT_APP_DB_NAME}:${process.env.REACT_APP_DB_NAME}@${process.env.REACT_APP_CLUSTER_NAME}.${process.env.REACT_APP_COLLECTION_NAME}.mongodb.net/${process.env.REACT_APP_DB_NAME}?retryWrites=true&w=majority`)
 
 app.use(cors());
 app.use(express.json())
